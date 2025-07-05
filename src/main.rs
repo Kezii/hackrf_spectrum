@@ -79,15 +79,13 @@ fn run_sweep() -> Sweep {
 
     let lines = String::from_utf8_lossy(&out.stdout)
         .lines()
-        .map(|x| SweepLine::parse_from_line(x))
+        .map(SweepLine::parse_from_line)
         .collect::<Vec<SweepLine>>();
 
-    let sweep = Sweep::from_lines(lines);
-
-    sweep
+    Sweep::from_lines(lines)
 }
 
-fn render_image(sweeps: &Vec<Sweep>, max_db: f32, min_db: f32) {
+fn render_image(sweeps: &[Sweep], max_db: f32, min_db: f32) {
     let width = sweeps[0].db.len();
     let height = sweeps.len();
 

@@ -9,7 +9,6 @@ pub use cli::SweepParams;
 
 use crate::sweep::Sweep;
 
-
 pub fn run_sweep(params: &SweepParams) -> Sweep {
     /*
     > hackrf_sweep

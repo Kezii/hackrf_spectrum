@@ -3,11 +3,6 @@ use hackrf_spectrum_analyzer::{run_sweep, sweep::Sweep, SweepParams};
 use log::info;
 use std::{process::Command, sync::mpsc::channel, thread};
 
-
-
-
-
-
 fn render_image(sweeps: &[Sweep], max_db: f32, min_db: f32) {
     let width = sweeps[0].db.len();
     let height = sweeps.len();
@@ -44,7 +39,6 @@ fn main() {
     let sw = run_sweep(&params);
 
     println!("{}", sw.pretty_print());
-
 
     let (tx, rx) = channel();
 

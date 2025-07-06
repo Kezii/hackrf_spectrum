@@ -1,4 +1,5 @@
 use clap::Parser;
+use log::info;
 use std::{process::Command, sync::mpsc::channel, thread};
 
 mod cli;
@@ -159,7 +160,10 @@ fn red_blue_color_map(db: f32, max_db: f32, min_db: f32) -> (u8, u8, u8) {
 }
 
 fn main() {
+    env_logger::init();
     let params = SweepParams::parse();
+
+    params.PrettyPrint();
     let sw = run_sweep(&params);
 
     let max_db = -10.0;
@@ -179,7 +183,7 @@ fn main() {
             let sw = rx.recv().expect("Unable to receive on channel");
             sweeps.push(sw);
             render_image(&sweeps, max_db, min_db);
-            println!("Rendered image {}", sweeps.len());
+            info!("Rendered image {}", sweeps.len());
         }
     });
 

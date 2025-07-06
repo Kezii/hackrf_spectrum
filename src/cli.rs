@@ -1,4 +1,5 @@
 use clap::Parser;
+use log::info;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
@@ -30,4 +31,28 @@ pub struct SweepParams {
     /// Antenna port power, 1=Enable, 0=Disable
     #[arg(short = 'p', long, default_value_t = 0)]
     pub antenna_enable: u8,
+}
+
+impl SweepParams {
+    pub fn PrettyPrint(&self) {
+        info!("Sweep Parameters:");
+        info!(
+            "RX gain: IF {} dB, BB {} dB, RF AMP {}",
+            self.lna_gain,
+            self.gain,
+            if self.amp_enable == 1 {
+                "ON (14dB)"
+            } else {
+                "OFF"
+            }
+        );
+        info!("FFT bin width: {}", self.bin_width);
+        info!("Minimum frequency: {}", self.freq_min);
+        info!("Maximum frequency: {}", self.freq_max);
+        info!(
+            "Expected image width: ~{}",
+            ((self.freq_max - self.freq_min) as f32 * 1_000_000.0) / (self.bin_width as f32)
+        );
+        info!("Antenna port power: {}", self.antenna_enable);
+    }
 }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.40", features = ["derive"] }
 colorous = "1.0.14"
 image = "0.25.1"
 show-image = "0.14.0"

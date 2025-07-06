@@ -1,4 +1,8 @@
+use clap::Parser;
 use std::{process::Command, sync::mpsc::channel, thread};
+
+mod cli;
+pub use cli::SweepParams;
 
 /*
 2024-05-31, 16:05:22.927896, 0, 5000000, 1000000.00, 20, -14.27, -26.26, -44.80, -53.68, -67.87
@@ -70,10 +74,51 @@ impl Sweep {
     }
 }
 
-fn run_sweep() -> Sweep {
+fn run_sweep(params: &SweepParams) -> Sweep {
+    /*
+    > hackrf_sweep --help
+    hackrf_sweep: invalid option -- '-'
+    Usage:
+            [-h] # this help
+            [-d serial_number] # Serial number of desired HackRF
+            [-a amp_enable] # RX RF amplifier 1=Enable, 0=Disable
+            [-f freq_min:freq_max] # minimum and maximum frequencies in MHz
+            [-p antenna_enable] # Antenna port power, 1=Enable, 0=Disable
+            [-l gain_db] # RX LNA (IF) gain, 0-40dB, 8dB steps
+            [-g gain_db] # RX VGA (baseband) gain, 0-62dB, 2dB steps
+            [-w bin_width] # FFT bin width (frequency resolution) in Hz, 2445-5000000
+            [-W wisdom_file] # Use FFTW wisdom file (will be created if necessary)
+            [-P estimate|measure|patient|exhaustive] # FFTW plan type, default is 'measure'
+            [-1] # one shot mode
+            [-N num_sweeps] # Number of sweeps to perform
+            [-B] # binary output
+            [-I] # binary inverse FFT output
+            [-n] # keep the same timestamp within a sweep
+            -r filename # output file
+
+    Output fields:
+            date, time, hz_low, hz_high, hz_bin_width, num_samples, dB, dB, . . .
+
+    */
+
+    let command = format!(
+        "hackrf_sweep -1 -g{} -l{} -w {} -f {}:{}{}{}",
+        params.gain,
+        params.lna_gain,
+        params.bin_width,
+        params.freq_min,
+        params.freq_max,
+        if params.amp_enable == 1 { " -a1" } else { "" },
+        if params.antenna_enable == 1 {
+            " -p1"
+        } else {
+            ""
+        }
+    );
+
     let out = Command::new("sh")
         .arg("-c")
-        .arg("hackrf_sweep -1 -g14 -l32 -w 100000 -f 0:3000")
+        .arg(command)
         .output()
         .expect("failed to execute process");
 
@@ -115,22 +160,17 @@ fn red_blue_color_map(db: f32, max_db: f32, min_db: f32) -> (u8, u8, u8) {
 
 #[show_image::main]
 fn main() {
-    let sw = run_sweep();
+    let params = SweepParams::parse();
+    let sw = run_sweep(&params);
 
     let max_db = -10.0;
     let min_db = -90.0;
 
-    // loop {
-    //     let sw = run_sweep();
-    //     sweeps.push(sw);
-
-    //     render_image(&sweeps, max_db, min_db);
-    // }
-
     let (tx, rx) = channel();
 
+    let params_clone = params.clone();
     let sender = thread::spawn(move || loop {
-        let sw = run_sweep();
+        let sw = run_sweep(&params_clone);
         tx.send(sw).expect("Unable to send on channel");
     });
 

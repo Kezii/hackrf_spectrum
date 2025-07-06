@@ -158,7 +158,6 @@ fn red_blue_color_map(db: f32, max_db: f32, min_db: f32) -> (u8, u8, u8) {
     (r, 0, b)
 }
 
-#[show_image::main]
 fn main() {
     let params = SweepParams::parse();
     let sw = run_sweep(&params);

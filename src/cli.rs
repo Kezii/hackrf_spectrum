@@ -31,6 +31,14 @@ pub struct SweepParams {
     /// Antenna port power, 1=Enable, 0=Disable
     #[arg(short = 'p', long, default_value_t = 0)]
     pub antenna_enable: u8,
+
+    /// Maximum dB value for visualization
+    #[arg(long, default_value_t = -10.0)]
+    pub max_db: f32,
+
+    /// Minimum dB value for visualization
+    #[arg(long, default_value_t = -80.0)]
+    pub min_db: f32,
 }
 
 impl SweepParams {
@@ -54,5 +62,6 @@ impl SweepParams {
             ((self.freq_max - self.freq_min) as f32 * 1_000_000.0) / (self.bin_width as f32)
         );
         info!("Antenna port power: {}", self.antenna_enable);
+        info!("Visualization dB range: {} to {}", self.min_db, self.max_db);
     }
 }

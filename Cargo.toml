@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
+color-eyre = "0.6.5"
 colorous = "1.0.14"
 env_logger = "0.11.8"
 image = "0.25.1"
 log = "0.4.27"
+ratatui = "0.29.0"

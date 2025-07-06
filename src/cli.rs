@@ -13,15 +13,15 @@ pub struct SweepParams {
     pub lna_gain: u8,
 
     /// FFT bin width (frequency resolution) in Hz, 2445-5000000
-    #[arg(short = 'w', long, default_value_t = 100000)]
+    #[arg(short = 'w', long, default_value_t = 10000)]
     pub bin_width: u32,
 
     /// Minimum frequency in MHz
-    #[arg(long, default_value_t = 0)]
+    #[arg(long, default_value_t = 2400)]
     pub freq_min: u32,
 
     /// Maximum frequency in MHz
-    #[arg(long, default_value_t = 3000)]
+    #[arg(long, default_value_t = 2500)]
     pub freq_max: u32,
 
     /// RX RF amplifier 1=Enable, 0=Disable
@@ -37,7 +37,7 @@ pub struct SweepParams {
     pub max_db: f32,
 
     /// Minimum dB value for visualization
-    #[arg(long, default_value_t = -80.0)]
+    #[arg(long, default_value_t = -90.0)]
     pub min_db: f32,
 }
 

@@ -86,8 +86,8 @@ impl Sweep {
         Self::from_lines(lines)
     }
 
-    pub fn pretty_print(&self) {
-        info!(
+    pub fn pretty_print(&self) -> String{
+        format!(
             "Sweep: {} Hz - {} Hz, {} Hz bin width, {} samples, max {} dB, min {} dB",
             self.hz_low,
             self.hz_high,
@@ -101,6 +101,6 @@ impl Sweep {
                 .iter()
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
                 .unwrap()
-        );
+        )
     }
 }

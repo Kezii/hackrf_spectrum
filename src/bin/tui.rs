@@ -124,8 +124,8 @@ impl App {
             data_points: Vec::new(),
             waterfall_history: VecDeque::new(),
             visualization_mode: VisualizationMode::Waterfall,
-            max_waterfall_lines: 100, // Numero di linee da mantenere nella waterfall
-            downscale_mode: DownscaleMode::Peak, // Default to peak mode
+            max_waterfall_lines: 200,
+            downscale_mode: DownscaleMode::Peak,
         }
     }
 

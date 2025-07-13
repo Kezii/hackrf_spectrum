@@ -396,8 +396,13 @@ impl App {
                             // we do not want to subsample the data, so we take the average of the n points that are in the same step
                             // because 1 "pixel" of the waterfall contains several bins of the fft
                             let n = step as usize;
-                            let average_db =
-                                db_sweep_data[idx..idx + n].iter().sum::<f32>() / n as f32;
+                            // let average_db =
+                            //     db_sweep_data[idx..idx + n].iter().sum::<f32>() / n as f32;
+
+                            let average_db = db_sweep_data[idx..idx + n]
+                                .iter()
+                                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                                .unwrap_or(&0.0);
 
                             // Normalize db value to 0.0-1.0 range
                             let normalized = (average_db - self.params.min_db)

@@ -19,7 +19,11 @@ use ratatui::{
 };
 
 use clap::Parser;
-use hackrf_spectrum_analyzer::{run_sweep, sweep::Sweep, SweepParams};
+use hackrf_spectrum_analyzer::{
+    run_sweep,
+    sweep::{DownscaleMode, Sweep},
+    SweepParams,
+};
 use log::info;
 
 // Importa la libreria colorous per la palette di colori
@@ -105,9 +109,10 @@ struct App {
     current_sweep: Option<Sweep>,
     params: SweepParams,
     data_points: Vec<(f64, f64)>,
-    waterfall_history: VecDeque<Vec<f32>>,
+    waterfall_history: VecDeque<Sweep>,
     visualization_mode: VisualizationMode,
     max_waterfall_lines: usize,
+    downscale_mode: DownscaleMode,
 }
 
 impl App {
@@ -120,6 +125,7 @@ impl App {
             waterfall_history: VecDeque::new(),
             visualization_mode: VisualizationMode::Waterfall,
             max_waterfall_lines: 100, // Numero di linee da mantenere nella waterfall
+            downscale_mode: DownscaleMode::Peak, // Default to peak mode
         }
     }
 
@@ -143,6 +149,14 @@ impl App {
                             self.visualization_mode = match self.visualization_mode {
                                 VisualizationMode::Spectrum => VisualizationMode::Waterfall,
                                 VisualizationMode::Waterfall => VisualizationMode::Spectrum,
+                            };
+                            terminal.draw(|frame| self.draw(frame))?;
+                        }
+                        KeyCode::Char('d') => {
+                            // Toggle downscale mode
+                            self.downscale_mode = match self.downscale_mode {
+                                DownscaleMode::Peak => DownscaleMode::Average,
+                                DownscaleMode::Average => DownscaleMode::Peak,
                             };
                             terminal.draw(|frame| self.draw(frame))?;
                         }
@@ -180,7 +194,7 @@ impl App {
             }
 
             // Update waterfall history
-            self.waterfall_history.push_front(sweep.db.clone());
+            self.waterfall_history.push_front(sweep.clone());
             if self.waterfall_history.len() > self.max_waterfall_lines {
                 self.waterfall_history.pop_back();
             }
@@ -248,6 +262,7 @@ impl App {
                 Span::styled(" [q] Quit", Style::default().fg(Color::Gray)),
                 Span::styled(" [r] Reset", Style::default().fg(Color::Gray)),
                 Span::styled(" [m] Mode", Style::default().fg(Color::Gray)),
+                Span::styled(" [d] Downscale", Style::default().fg(Color::Gray)),
             ]);
 
             // Render info text on first line
@@ -261,7 +276,14 @@ impl App {
                 ratatui::widgets::Paragraph::new(Line::from(vec![
                     Span::styled(radio_params_text, Style::default().fg(Color::Yellow)),
                     Span::styled(
-                        format!(" - {}", mode_text),
+                        format!(
+                            " - {} - Downscale: {}",
+                            mode_text,
+                            match self.downscale_mode {
+                                DownscaleMode::Peak => "Peak",
+                                DownscaleMode::Average => "Average",
+                            }
+                        ),
                         Style::default().fg(Color::Green),
                     ),
                 ])),
@@ -385,42 +407,29 @@ impl App {
 
                 // for each history line
                 for y in 0..lines_to_show {
-                    let db_sweep_data = &self.waterfall_history[y];
+                    let sweep = &self.waterfall_history[y];
 
-                    // Scale the sweep data to fit the width
-                    let step = db_sweep_data.len() as f64 / width as f64;
+                    // Downscale the sweep data to fit the width
+                    let downscaled_data = sweep.downscale(width, self.downscale_mode);
 
-                    for x in 0..width {
-                        let idx = (x as f64 * step) as usize;
-                        if idx < db_sweep_data.len() {
-                            // we do not want to subsample the data, so we take the average of the n points that are in the same step
-                            // because 1 "pixel" of the waterfall contains several bins of the fft
-                            let n = step as usize;
-                            // let average_db =
-                            //     db_sweep_data[idx..idx + n].iter().sum::<f32>() / n as f32;
+                    // Render each point in the downscaled data
+                    for (x, &db_value) in downscaled_data.iter().enumerate() {
+                        // Normalize db value to 0.0-1.0 range
+                        let normalized = (db_value - self.params.min_db)
+                            / (self.params.max_db - self.params.min_db);
+                        let normalized = normalized.clamp(0.0, 1.0);
 
-                            let average_db = db_sweep_data[idx..idx + n]
-                                .iter()
-                                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                                .unwrap_or(&0.0);
+                        // Get color from inferno palette
+                        let color = self.get_color_from_value(normalized);
 
-                            // Normalize db value to 0.0-1.0 range
-                            let normalized = (average_db - self.params.min_db)
-                                / (self.params.max_db - self.params.min_db);
-                            let normalized = normalized.clamp(0.0, 1.0);
-
-                            // Get color from inferno palette (similar to image_logger)
-                            let color = self.get_color_from_value(normalized);
-
-                            // Draw a single pixel
-                            ctx.draw(&Rectangle {
-                                x: x as f64,
-                                y: y as f64,
-                                width: 1.0,
-                                height: 1.0,
-                                color,
-                            });
-                        }
+                        // Draw a single pixel
+                        ctx.draw(&Rectangle {
+                            x: x as f64,
+                            y: y as f64,
+                            width: 1.0,
+                            height: 1.0,
+                            color,
+                        });
                     }
                 }
             })

@@ -11,6 +11,15 @@
 
 use log::info;
 
+/// Mode for downscaling db values
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DownscaleMode {
+    /// Use the average value in each segment
+    Average,
+    /// Use the peak (maximum) value in each segment
+    Peak,
+}
+
 #[derive(Debug)]
 struct SweepLine {
     date: String,
@@ -50,7 +59,7 @@ impl SweepLine {
 }
 
 // the complete spectrum
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Sweep {
     pub hz_low: u64,
     pub hz_high: u64,
@@ -102,5 +111,44 @@ impl Sweep {
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
                 .unwrap()
         )
+    }
+
+    /// Downscale the db values to fit the given width
+    /// Returns a vector of db values downscaled to the given width
+    pub fn downscale(&self, target_width: usize, mode: DownscaleMode) -> Vec<f32> {
+        if target_width >= self.db.len() {
+            return self.db.clone(); // No downscaling needed
+        }
+
+        let step = self.db.len() as f64 / target_width as f64;
+        let mut result = Vec::with_capacity(target_width);
+
+        for x in 0..target_width {
+            let idx = (x as f64 * step) as usize;
+            if idx < self.db.len() {
+                // Calculate the end index for this segment
+                let end_idx = std::cmp::min(idx + step as usize, self.db.len());
+
+                let db_value = match mode {
+                    DownscaleMode::Peak => {
+                        // Find the maximum value in this segment (to highlight peaks)
+                        *self.db[idx..end_idx]
+                            .iter()
+                            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                            .unwrap_or(&0.0)
+                    }
+                    DownscaleMode::Average => {
+                        // Calculate the average value in this segment
+                        let sum: f32 = self.db[idx..end_idx].iter().sum();
+                        let count = end_idx - idx;
+                        sum / count as f32
+                    }
+                };
+
+                result.push(db_value);
+            }
+        }
+
+        result
     }
 }

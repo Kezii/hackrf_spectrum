@@ -398,6 +398,7 @@ impl App {
         frame.render_widget(block, area);
 
         let waterfall = Canvas::default()
+            .marker(symbols::Marker::Block)
             .paint(|ctx| {
                 let width = inner_area.width as usize;
                 let height = inner_area.height as usize;

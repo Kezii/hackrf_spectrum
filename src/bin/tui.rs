@@ -184,12 +184,12 @@ impl App {
             // Update spectrum data points
             self.data_points.clear();
 
-            let freq_range = (self.params.freq_max - self.params.freq_min) as f64;
+            let freq_range = (self.params.max_freq - self.params.min_freq) as f64;
             let point_count = sweep.db.len();
 
             for (i, db) in sweep.db.iter().enumerate() {
                 let freq =
-                    self.params.freq_min as f64 + (i as f64 / point_count as f64) * freq_range;
+                    self.params.min_freq as f64 + (i as f64 / point_count as f64) * freq_range;
                 self.data_points.push((freq, *db as f64));
             }
 
@@ -214,8 +214,8 @@ impl App {
         let info_text = if let Some(sweep) = &self.current_sweep {
             format!(
                 "{} - {} MHz, {} points, min: {:.1} dB, max: {:.1} dB, Bin width {} Hz",
-                self.params.freq_min,
-                self.params.freq_max,
+                self.params.min_freq,
+                self.params.max_freq,
                 sweep.db.len(),
                 sweep.db.iter().cloned().fold(f32::INFINITY, f32::min),
                 sweep.db.iter().cloned().fold(f32::NEG_INFINITY, f32::max),
@@ -321,67 +321,180 @@ impl App {
             return;
         }
 
-        // Find the actual min and max frequencies
-        let min_freq = self.params.freq_min as f64;
-        let max_freq = self.params.freq_max as f64;
-
-        // Create x-axis labels
-        let mid_freq = (min_freq + max_freq) / 2.0;
-        let x_labels = vec![
-            Span::styled(
-                format!("{:.1}", min_freq),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(format!("{:.1}", mid_freq)),
-            Span::styled(
-                format!("{:.1}", max_freq),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-        ];
-
-        // Create y-axis labels
+        // Find the actual min and max frequencies and power levels
+        let min_freq = self.params.min_freq as f64;
+        let max_freq = self.params.max_freq as f64;
         let min_db = self.params.min_db as f64;
         let max_db = self.params.max_db as f64;
-        let mid_db = (min_db + max_db) / 2.0;
 
-        let y_labels = vec![
-            Span::styled(
-                format!("{:.1}", min_db),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(format!("{:.1}", mid_db)),
-            Span::styled(
-                format!("{:.1}", max_db),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+        // Create a block with border and title
+        let block = Block::bordered()
+            .title("Spectrum")
+            .title_alignment(ratatui::layout::Alignment::Center);
+
+        let inner_area = block.inner(area);
+
+        frame.render_widget(block, area);
+
+        // Create a canvas to draw the density-colored spectrum
+        let spectrum = Canvas::default()
+            .marker(symbols::Marker::HalfBlock)
+            .paint(|ctx| {
+                let width = inner_area.width as usize;
+                let height = inner_area.height as usize;
+
+                if width == 0 || height == 0 || self.data_points.is_empty() {
+                    return;
+                }
+
+                // Create a 2D grid to count how many points fall into each pixel
+                let mut density_grid = vec![vec![0u32; height]; width];
+                let mut max_density = 0u32;
+
+                // Map each data point to a pixel and count density
+                for &(freq, db) in &self.data_points {
+                    // Calculate x position (frequency)
+                    let x_pos =
+                        ((freq - min_freq) / (max_freq - min_freq) * (width as f64 - 1.0)) as usize;
+
+                    // Calculate y position (power)
+                    let y_normalized = (db - min_db) / (max_db - min_db);
+                    let y_normalized = y_normalized.clamp(0.0, 1.0);
+                    // Use y_normalized directly without inverting
+                    let y_pos = (height as f64 * y_normalized) as usize;
+
+                    // Ensure we're within bounds
+                    if x_pos < width && y_pos < height && x_pos > 0 && y_pos > 0 {
+                        // Increment the density counter for this pixel
+                        density_grid[x_pos][y_pos] += 1;
+                        max_density = max_density.max(density_grid[x_pos][y_pos]);
+                    }
+                }
+
+                // Now draw each pixel with color based on its density
+                for x in 0..width {
+                    for y in 0..height {
+                        let density = density_grid[x][y];
+
+                        // Only draw pixels that have at least one point
+                        if density > 0 {
+                            // Normalize density to 0.0-1.0 range for color
+                            let normalized_density = density as f32 / max_density as f32;
+
+                            // Get color based on density
+                            let color = self.get_color_from_value(normalized_density);
+
+                            // Draw a single pixel
+                            ctx.draw(&Rectangle {
+                                x: x as f64,
+                                y: y as f64,
+                                width: 1.0,
+                                height: 1.0,
+                                color,
+                            });
+                        }
+                    }
+                }
+            })
+            .x_bounds([0.0, inner_area.width as f64])
+            .y_bounds([0.0, inner_area.height as f64]);
+
+        frame.render_widget(spectrum, inner_area);
+
+        // Add frequency labels at the bottom
+        let mid_freq = (min_freq + max_freq) / 2.0;
+
+        let labels = vec![
+            format!("{:.1} MHz", min_freq),
+            format!("{:.1} MHz", mid_freq),
+            format!("{:.1} MHz", max_freq),
         ];
 
-        // Create dataset from current sweep data
-        let dataset = Dataset::default()
-            .name("Spectrum")
-            .marker(symbols::Marker::Braille)
-            .style(Style::default().fg(Color::Cyan))
-            .data(&self.data_points);
+        let label_width = 12;
+        let spacing = (inner_area.width - 3 * label_width) / 2;
 
-        // Create the chart
-        let chart = Chart::new(vec![dataset])
-            .block(Block::bordered())
-            .x_axis(
-                Axis::default()
-                    .title("Frequency (MHz)")
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([min_freq, max_freq])
-                    .labels(x_labels),
-            )
-            .y_axis(
-                Axis::default()
-                    .title("Power (dB)")
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([min_db, max_db])
-                    .labels(y_labels),
-            );
+        // Render min frequency label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                labels[0].clone(),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(
+                inner_area.x,
+                inner_area.y + inner_area.height - 1,
+                label_width,
+                1,
+            ),
+        );
 
-        frame.render_widget(chart, area);
+        // Render mid frequency label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                labels[1].clone(),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(
+                inner_area.x + label_width + spacing,
+                inner_area.y + inner_area.height - 1,
+                label_width,
+                1,
+            ),
+        );
+
+        // Render max frequency label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                labels[2].clone(),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(
+                inner_area.x + 2 * (label_width + spacing),
+                inner_area.y + inner_area.height - 1,
+                label_width,
+                1,
+            ),
+        );
+
+        // Add dB level labels on the side
+        let db_label_height = 1;
+        let db_spacing = (inner_area.height - 3 * db_label_height) / 2;
+
+        // Render max dB label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                format!("{:.1} dB", max_db),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(inner_area.x, inner_area.y, label_width, db_label_height),
+        );
+
+        // Render mid dB label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                format!("{:.1} dB", (min_db + max_db) / 2.0),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(
+                inner_area.x,
+                inner_area.y + db_label_height + db_spacing,
+                label_width,
+                db_label_height,
+            ),
+        );
+
+        // Render min dB label
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Span::styled(
+                format!("{:.1} dB", min_db),
+                Style::default().fg(Color::Gray),
+            )),
+            Rect::new(
+                inner_area.x,
+                inner_area.y + 2 * (db_label_height + db_spacing),
+                label_width,
+                db_label_height,
+            ),
+        );
     }
 
     fn render_waterfall(&self, frame: &mut Frame, area: Rect) {
@@ -440,8 +553,8 @@ impl App {
         frame.render_widget(waterfall, inner_area);
 
         // Add frequency labels at the bottom
-        let min_freq = self.params.freq_min;
-        let max_freq = self.params.freq_max;
+        let min_freq = self.params.min_freq;
+        let max_freq = self.params.max_freq;
         let mid_freq = (min_freq + max_freq) / 2;
 
         let labels = vec![

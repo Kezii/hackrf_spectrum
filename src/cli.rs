@@ -18,11 +18,11 @@ pub struct SweepParams {
 
     /// Minimum frequency in MHz
     #[arg(long, default_value_t = 2400)]
-    pub freq_min: u32,
+    pub min_freq: u32,
 
     /// Maximum frequency in MHz
     #[arg(long, default_value_t = 2500)]
-    pub freq_max: u32,
+    pub max_freq: u32,
 
     /// RX RF amplifier 1=Enable, 0=Disable
     #[arg(short = 'a', long, default_value_t = 0)]
@@ -37,7 +37,7 @@ pub struct SweepParams {
     pub max_db: f32,
 
     /// Minimum dB value for visualization
-    #[arg(long, default_value_t = -90.0)]
+    #[arg(long, default_value_t = -100.0)]
     pub min_db: f32,
 }
 
@@ -55,11 +55,11 @@ impl SweepParams {
             }
         );
         info!("FFT bin width: {}", self.bin_width);
-        info!("Minimum frequency: {}", self.freq_min);
-        info!("Maximum frequency: {}", self.freq_max);
+        info!("Minimum frequency: {}", self.min_freq);
+        info!("Maximum frequency: {}", self.max_freq);
         info!(
             "Expected image width: ~{}",
-            ((self.freq_max - self.freq_min) as f32 * 1_000_000.0) / (self.bin_width as f32)
+            ((self.max_freq - self.min_freq) as f32 * 1_000_000.0) / (self.bin_width as f32)
         );
         info!("Antenna port power: {}", self.antenna_enable);
         info!("Visualization dB range: {} to {}", self.min_db, self.max_db);

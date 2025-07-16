@@ -40,8 +40,8 @@ pub fn run_sweep(params: &SweepParams) -> Sweep {
         params.gain,
         params.lna_gain,
         params.bin_width,
-        params.freq_min,
-        params.freq_max,
+        params.min_freq,
+        params.max_freq,
         if params.amp_enable == 1 { " -a1" } else { "" },
         if params.antenna_enable == 1 {
             " -p1"
